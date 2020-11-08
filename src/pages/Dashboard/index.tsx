@@ -1,10 +1,10 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import { FiChevronRight } from 'react-icons/fi';
 import api from '../../services/api';
 
 import logoImg from '../../assets/logo.svg';
 
-import { Title, Form, Repositories } from './styles';
+import { Title, Form, Repositories, Error } from './styles';
 
 interface Repository {
   full_name: string;
@@ -17,19 +17,47 @@ interface Repository {
 
 const Dashboard: React.FC = () => {
   const [newRepo, setNewRepo] = useState('');
-  const [repositories, setRepositores] = useState<Repository[]>([]);
+  const [inputError, setInputError] = useState('');
+  const [repositories, setRepositores] = useState<Repository[]>(() => {
+    const storagedRepositories = localStorage.getItem(
+      '@githubExplorer:repositories',
+    );
+
+    if (storagedRepositories) {
+      return JSON.parse(storagedRepositories);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      '@githubExplorer:repositories',
+      JSON.stringify(repositories),
+    );
+  }, [repositories]);
 
   async function hadleAddRepository(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
 
-    const response = await api.get<Repository>(`repos/${newRepo}`);
+    if (!newRepo) {
+      setInputError('Digite o cep, Ex: 00000000');
+      return;
+    }
 
-    const repository = response.data;
+    try {
+      const response = await api.get<Repository>(`repos/${newRepo}`);
 
-    setRepositores([...repositories, repository]);
-    setNewRepo('');
+      const repository = response.data;
+
+      setRepositores([...repositories, repository]);
+      setNewRepo('');
+      setInputError('');
+    } catch (err) {
+      setInputError('Erro na busca por esse endereço');
+    }
+
     // Adição de um novo repositório
     // consumir API do Github
     // salvar novo repositório no estado
@@ -38,7 +66,7 @@ const Dashboard: React.FC = () => {
     <>
       <img src={logoImg} alt="Github Explore" />
       <Title>Explore repositórios no Github.</Title>
-      <Form onSubmit={hadleAddRepository}>
+      <Form hasError={!!inputError} onSubmit={hadleAddRepository}>
         <input
           value={newRepo}
           onChange={e => setNewRepo(e.target.value)}
@@ -46,6 +74,8 @@ const Dashboard: React.FC = () => {
         />
         <button type="submit">Pesquisar</button>
       </Form>
+
+      {inputError && <Error>{inputError}</Error>}
       <Repositories>
         {repositories.map(repository => (
           <a key={repository.full_name} href="teste">
